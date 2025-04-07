@@ -1,2 +1,9 @@
+#dependecies
 node_modules
-database
+
+#Database
+db/ .db
+
+#environment
+.env
+.env.test
