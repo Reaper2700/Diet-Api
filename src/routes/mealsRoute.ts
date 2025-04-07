@@ -133,7 +133,7 @@ export async function mealsRoute(app: FastifyInstance) {
     {
       preHandler: [checkIdExist],
     },
-    async (request) => {
+    async (request, reply) => {
       const { id } = request.params as { id: string }
       const { userId } = request.cookies
 
@@ -147,19 +147,36 @@ export async function mealsRoute(app: FastifyInstance) {
         request.body,
       )
 
-      const updatedMeals = await knex('meals')
-        .where({ id, user_id: userId })
-        .update(
-          {
-            name,
-            description,
-            is_healthy: ishealthy,
-          },
-          ['id', 'name', 'description', 'date', 'is_healthy'],
-        )
-        .finally()
+      try {
+        const meal = await knex('meals').where({ id }).first()
 
-      return { updatedMeals }
+        if (!meal) {
+          return reply.status(402).send({ message: 'Refeição não encontrada' })
+        }
+
+        if (meal.user_id !== userId) {
+          return reply.status(403).send({
+            message: 'Você não tem permissão para editar esta refeição.',
+          })
+        }
+
+        const updatedMeals = await knex('meals')
+          .where({ id, user_id: userId })
+          .update(
+            {
+              name,
+              description,
+              is_healthy: ishealthy,
+            },
+            ['id', 'name', 'description', 'date', 'is_healthy'],
+          )
+          .finally()
+
+        return { updatedMeals }
+      } catch (error) {
+        console.error(error)
+        return reply.status(500).send({ message: 'Erro interno do servidor.' })
+      }
     },
   )
 
@@ -169,12 +186,28 @@ export async function mealsRoute(app: FastifyInstance) {
       preHandler: [checkIdExist],
     },
     async (request, reply) => {
+      const { userId } = request.cookies
       const { id } = request.params as { id: string }
-      console.log(id)
 
-      await knex('meals').where('id', id).delete()
+      try {
+        const meal = await knex('meals').where('user_id', userId).first()
 
-      return reply.status(201).send()
+        if (!meal) {
+          return reply.status(402).send({ message: 'Refeição não encontrada' })
+        }
+        if (meal.user_id !== userId) {
+          console.log(userId)
+          console.log(meal.user_id)
+          return reply.status(402).send({ message: 'usuario não autorizado' })
+        }
+
+        await knex('meals').where({ id, user_id: userId }).delete()
+
+        return reply.status(201).send()
+      } catch (error) {
+        console.error(error)
+        return reply.status(500).send({ message: 'Erro interno do servidor.' })
+      }
     },
   )
 }
